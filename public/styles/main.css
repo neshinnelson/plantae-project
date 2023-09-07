@@ -1,0 +1,9 @@
+body{
+    background-color: cornflowerblue;
+}
+form{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-around;
+}
