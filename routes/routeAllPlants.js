@@ -3,11 +3,11 @@ import ModelAllPlants from '../models/modelPlantData.js'
 const router = express.Router()
 
 router.get('/filter',async(req,res)=>{
-   const name = req.query.name
-   // console.log(name);
+   const category = req.query.category
+   console.log(category);
    
    try{
-    const data = await ModelAllPlants.find({name:name})
+    const data = await ModelAllPlants.find({category:category})
     res.json(data)
    //  console.log('what');
    }

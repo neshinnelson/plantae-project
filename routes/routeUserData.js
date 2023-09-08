@@ -15,6 +15,7 @@ router.get('/:id',async(req,res)=>{
     }
 })
 router.post('/',async(req,res)=>{
+    console.log(req.body);
 
     if(req.body.userName.length > 8 && req.body.password.length > 8){
         const data =  ModelUserData(req.body);
@@ -32,6 +33,7 @@ router.post('/authorise', async(req,res)=>{
     let response
     let message
     let isLogedIn
+    let userFullName
 
     let data =  await ModelUserData.find({userName: req.body.userName})
     // console.log(data);
@@ -40,6 +42,8 @@ router.post('/authorise', async(req,res)=>{
         response = 'success'
         message='user is authorised'
         isLogedIn = true
+        userFullName = data[0].firstName
+        
     }
     else{
         response = 'failed'
@@ -47,7 +51,7 @@ router.post('/authorise', async(req,res)=>{
         isLogedIn = false
         // throw new Error('Unauthorized: Invalid username or password');
     }
-    res.json({response,message,isLogedIn})
+    res.json({response,message,isLogedIn,userFullName})
 })
 
 export default router

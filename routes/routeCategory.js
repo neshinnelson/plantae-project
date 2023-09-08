@@ -6,8 +6,9 @@ const router = express.Router();
 router.get('/',async(req,res)=>{
     const category = req.query.category
     try{
-        const data = await ModelCategory.find({category:category})
+        const data = await ModelCategory.find({name:category})
         res.json(data)
+        console.log('data sent');
     }
     catch(err){
         console.error('server error',err);
@@ -16,6 +17,7 @@ router.get('/',async(req,res)=>{
 })
 
 router.post('/',async(req,res)=>{
+
    try{
     const data = ModelCategory(req.body);
     await data.save();

@@ -2,6 +2,7 @@ import express from 'express';
 import morgan from 'morgan';
 import mongoose from 'mongoose';
 import 'dotenv/config'
+import cors from 'cors'
 
 //importing routes
 import routeAllPlants from './routes/routeAllPlants.js'
@@ -24,6 +25,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 //middleware
+app.use(cors())
 app.use(morgan('tiny'))
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
