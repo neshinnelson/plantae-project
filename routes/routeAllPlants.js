@@ -7,8 +7,15 @@ router.get('/filter',async(req,res)=>{
    console.log(category);
    
    try{
-    const data = await ModelAllPlants.find({category:category})
-    res.json(data)
+      if(category===''){
+         const data = await ModelAllPlants.find()
+         res.json(data)    
+      }
+      else{
+         const data = await ModelAllPlants.find({category:category})
+         res.json(data)
+      }
+
    //  console.log('what');
    }
    catch(err){
@@ -37,6 +44,25 @@ router.post('/',async(req,res)=>{
     console.log(req.body.name);
     console.log(req.body.shippingTime);
    }
+
+})
+
+router.post('/new-plant',async(req,res)=>{
+  try{
+   if(data===''){
+      res.json({res:'failed',message:'required fields are empty!'})
+   }
+   else{
+      const data = ModelAllPlants(req.body);
+      await data.save();
+      res.json({res:'success',message:'new plant is posted to database'}).status(201)
+   }
+   
+  }
+  catch(err){
+   console.error('unable to find data',err);
+   res.json({res:'failed',message:'unable to post. check the data enterd!'}).status(400)
+  }
 
 })
 

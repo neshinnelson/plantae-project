@@ -34,6 +34,7 @@ router.post('/authorise', async(req,res)=>{
     let message
     let isLogedIn
     let userFullName
+    let userId
 
     let data =  await ModelUserData.find({userName: req.body.userName})
     // console.log(data);
@@ -42,8 +43,8 @@ router.post('/authorise', async(req,res)=>{
         response = 'success'
         message='user is authorised'
         isLogedIn = true
-        userFullName = data[0].firstName
-        
+        userFullName = data[0].firstName +" "+ data[0].secondName
+        userId = data[0]._id        
     }
     else{
         response = 'failed'
@@ -51,7 +52,7 @@ router.post('/authorise', async(req,res)=>{
         isLogedIn = false
         // throw new Error('Unauthorized: Invalid username or password');
     }
-    res.json({response,message,isLogedIn,userFullName})
+    res.json({response,message,isLogedIn,userFullName,userId})
 })
 
 export default router

@@ -5,8 +5,10 @@ const router = express.Router();
 
 router.get('/:id',async(req,res)=>{
     try{
-        const data = await ModelCart.findById(req.params.id)
-        res.json(data)
+        const data = await ModelCart.find({userId:req.params.id})
+        // res.json(data)
+        res.json({res:'success',message:'all cart is fetched belongs to the useris is fetched',data})
+
     }
     catch(err){
         console.error('unable to fetch data now',err);
@@ -14,11 +16,18 @@ router.get('/:id',async(req,res)=>{
     }
 })
 
+//get all item in cart
+router.get('/',async(req,res)=>{
+    const data = await ModelCart.find()
+    res.json({res:'success',message:'all cart is fetched',data})
+})
+
+
 router.post('/',async(req,res)=>{   
     try{
         const data = ModelCart(req.body)
         await data.save();
-        res.json(data)
+        res.json({res:'success',message:'item moved to cart',data})
     }
     catch(err){
         console.error('unable to post data now. check data', err);
@@ -26,4 +35,8 @@ router.post('/',async(req,res)=>{
     }
 })
 
+router.delete('/:id',async(req,res)=>{
+    const data = await ModelCart.findOneAndDelete({name:req.params.id})
+    res.json({data,mesg:'gfgf'})
+})
 export default router
