@@ -10,3 +10,4 @@ import mongoose from "mongoose";
 })
 
 export default new mongoose.model('UserData',userSchema)
+

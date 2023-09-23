@@ -1,11 +1,17 @@
 import express from 'express';
-import ModelCart from '../models/modelCart.js';
+import ModelTempCart from '../models/modelTempCart.js';
 
 const router = express.Router();
 
+// clearing temeperary cart every 5 minutes
+setInterval(async()=>{
+ await ModelTempCart.deleteMany({})
+ console.log('temp-cart is cleared')
+},1000*60*5)
+
 router.get('/:id',async(req,res)=>{
     try{
-        const data = await ModelCart.find({userId:req.params.id})
+        const data = await ModelTempCart.find({userId:req.params.id})
         // res.json(data)
         res.json({res:'success',message:'all cart is fetched belongs to the useris is fetched',data})
 
@@ -18,14 +24,14 @@ router.get('/:id',async(req,res)=>{
 
 //get all item in cart
 router.get('/',async(req,res)=>{
-    const data = await ModelCart.find()
-    res.json({res:'success',message:'all cart is fetched',data})
+    const data = await ModelTempCart.find()
+    res.json({res:'success',message:'all items in temperary cart is fetched',data})
 })
 
 
 router.post('/',async(req,res)=>{   
     try{
-        const data = ModelCart(req.body)
+        const data = ModelTempCart(req.body)
         await data.save();
         res.json({res:'success',message:'item moved to cart',data})
     }
@@ -35,22 +41,8 @@ router.post('/',async(req,res)=>{
     }
 })
 
-//put request handle
-router.put('/:id',async(req,res)=>{
-    console.log(req.body.quantity);
-   try{
-    const data = await ModelCart.findByIdAndUpdate(req.params.id,{quantity:req.body.quantity})
-    // console.log(data);
-    if(!data) return res.json({response:'failed',message:'quantity was unable to update'}) 
-    res.json({response:'success',message:'quantity updated'})
-   }
-   catch(err){
-    console.error('put request failed',err);
-   }
-})
-
 router.delete('/:id',async(req,res)=>{
-    const data = await ModelCart.findOneAndDelete({_id:req.params.id})
+    const data = await ModelTempCart.findOneAndDelete({_id:req.params.id})
     res.json({data,message:'item deleted from cart'})
 })
 export default router

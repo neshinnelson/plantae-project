@@ -6,3 +6,4 @@ const categorySchema = new mongoose.Schema({
 })
 
 export default new mongoose.model('category',categorySchema)
+
