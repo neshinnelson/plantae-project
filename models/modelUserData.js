@@ -7,7 +7,9 @@ import mongoose from "mongoose";
     userName:{type:String,required:true},
     password:{type:String,required:true},
     phone:{type:Number,required:true},
+    address:{type:Object},
+    boughtItems:{type:Array}
 })
 
-export default new mongoose.model('UserData',userSchema)
+export default new mongoose.model('User-Data',userSchema)
 

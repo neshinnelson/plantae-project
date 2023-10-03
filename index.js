@@ -14,6 +14,7 @@ import routeCategory from './routes/routeCategory.js'
 import routeCart from './routes/routeCart.js'
 import routeWhishlist from './routes/routeWhishlist.js'
 import routeTempCart from './routes/routeTempCart.js'
+import routeCheckout from './routes/routeCheckout.js'
 
 //CONNECTING TO MONGODB
 mongoose.connect(process.env.MONGO_CONNECT,{ useNewUrlParser: true, useUnifiedTopology: true })
@@ -27,6 +28,7 @@ db.on('open',()=>{
 
 const app = express();
 const port = process.env.PORT || 5000;
+export const apiKey = process.env.API_KEY
 
 //middleware
 app.use(cors())
@@ -47,6 +49,7 @@ app.use('/category',routeCategory);
 app.use('/cart',routeCart);
 app.use('/wishlist',routeWhishlist);
 app.use('/temp-cart',routeTempCart);
+app.use('/checkout',routeCheckout)
 
 // refresh token array
 let copyRefreshTokens = refreshTokens
