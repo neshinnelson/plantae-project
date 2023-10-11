@@ -15,6 +15,7 @@ import routeCart from './routes/routeCart.js'
 import routeWhishlist from './routes/routeWhishlist.js'
 import routeTempCart from './routes/routeTempCart.js'
 import routeCheckout from './routes/routeCheckout.js'
+import { hasApiKey } from './middleware/checkApiKey.js';
 
 //CONNECTING TO MONGODB
 mongoose.connect(process.env.MONGO_CONNECT,{ useNewUrlParser: true, useUnifiedTopology: true })
@@ -54,7 +55,7 @@ app.use('/checkout',routeCheckout)
 // refresh token array
 let copyRefreshTokens = refreshTokens
 //generating new token using refresh token
-app.post('/new-token',(req,res)=>{
+app.post('/new-token',hasApiKey,(req,res)=>{
     const refreshToken = req.body.refreshToken
     // console.log(refreshToken);
     // console.log(copyRefreshTokens);
@@ -76,8 +77,6 @@ app.post('/new-token',(req,res)=>{
     }
         
 })
-
-// console.log(copyRefreshTokens);
 
 app.listen(port,()=>{
     console.log(`example app listening on port ${port}`);

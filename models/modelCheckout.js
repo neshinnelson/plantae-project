@@ -12,7 +12,6 @@ const checkoutSchema = new mongoose.Schema({
     }
 })
 
-checkoutSchema.index({ userId: 1 }, { unique: true });
 
 
 export default mongoose.model('checkout',checkoutSchema)

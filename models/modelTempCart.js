@@ -8,6 +8,7 @@ const tempCartSchema = new mongoose.Schema({
     rating:{type:String,required:true},
     quantity:{type:Number,required:true},
     potColor:{type:Array,required:true},
+    plantId:{type:String,required:true}
     
 })
 

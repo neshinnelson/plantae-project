@@ -10,7 +10,8 @@ const plantSchema = new mongoose.Schema({
     potColor:{type:Array,required:true},
     stock:{type:Number,required:true},
     shippingTime:{type:Number,required:true},
-    description:{type:String,required:true}
+    description:{type:String,required:true},
+    plantId:{type:String,unique:true}
 })
 
 export default new mongoose.model('all plant',plantSchema)

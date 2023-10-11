@@ -1,170 +1,274 @@
-import express, { Router } from 'express'
+import express from 'express'
 import ModelUserData from '../models/modelUserData.js'
 import bcrypt from 'bcrypt'
-import jwt  from 'jsonwebtoken'
+import jwt from 'jsonwebtoken'
 import 'dotenv/config'
-import cookieParser from 'cookie-parser';
-import { apiKey } from '../index.js'
+import randomstring from 'randomstring'
+import { hasApiKey } from '../middleware/checkApiKey.js'
+import { checkBcrypt, checkQueryUser, checkUpdateAddress, issueToken, verifyToken } from '../functions.module.js'
 
 const router = express.Router()
 
-router.use(cookieParser())
 
 // array to store refresh tokens
 export const refreshTokens = []
 
-router.get('/:id',async(req,res)=>{
-    if (req.query.apikey=== apiKey) {
+// handle to fetch address, email bought items fullname
+router.get('/:id',hasApiKey,async(req,res)=>{
+    const userId = req.params.id
+    //verifying client token
+    const queryToken = req.query.token?req.body.token:''
+    const authHeader = req.headers.authorization?req.headers['authorization'].split(' ')[1]:''
+    const authToken = queryToken?queryToken:authHeader
+
+    if(!authToken) return res.status(401).json({respose:'failed',message:'no token found !'})
+    //verify token
+    const hasToken = await verifyToken(authToken)
+    // console.log(hasToken,'has token:');
+    if(hasToken !== true) return res.status(401).json({response:'failed',message:'token is invalid or expired'})
 
         if(req.query){
-            const searchParam = req.query.address?'address':req.query.boughtItem?'boughtItem':'_id firstName secondName'
-            // console.log(searchParam);
+            const searchParams = checkQueryUser(req.query.find)
+            
             try{
-                const data = await ModelUserData.findById(req.params.id,searchParam)
-                res.json({respone:'success',message:'query is fetched',data})
+                const data = await ModelUserData.find({userId},searchParams,{_id:0}).exec();
+
+                const resData = searchParams==='address'?data[0].address:
+                searchParams==='email'?data[0].email:
+                searchParams==='boughtItems'?data[0].boughtItems:
+                data[0].firstName + ' ' +data[0].secondName
+
+        
+                res.json({respone:'success',message:'query is fetched',data:data})
             }catch(err){
                 console.log('unable to fetch data from db');
                 console.error(err);
-                res.json({respone:'failed',message:'query is wrong'})
+                res.status(406).json({respone:'failed',message:'query is wrong'})
             }
+        }else{
+            res.status(406).json({response:'failed',message:'query not found!'})
         }
-        // try{
-        //     const data = await ModelUserData.findById(req.params.id)
-        //     res.cookie("jwt",'working')
-        //     res.json(data)
-        // }
-        // catch(err){
-        //     console.error(err);
-        //     res.send('serve error').status(500)
-        // }
         
-    }else{
-        console.log('no api key');
-        res.json({respose:'un authorised.no api key!'})
-    }   
 })
-router.post('/',async(req,res)=>{
-    console.log(req.body);
+
+// user registration handle
+router.post('/',hasApiKey,async(req,res)=>{
+
+     //checking wheather userExist or not
+     let userExists =  await ModelUserData.find({userName: req.body.userName})
+     if(userExists.length > 0) return res.status(406).json({response:'failed', message:'duplicate err!!,username already exist!'})
+    
     const regEx = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
-    console.log(regEx.test(req.body.password))
 
-   try{
-    if(req.body.userName.length > 8 && regEx.test(req.body.password)){
-        // hashing the password using bcrypt
-        console.log(regEx.test(req.body.password.length));
-        const hashedPass = await bcrypt.hash(req.body.password,10)
-        console.log(hashedPass)
-        const data =  ModelUserData(req.body);
-        data.password = hashedPass
-        await data.save();
-        res.json({response:'success',message:'data posted to db'})
-        console.log('data posted to db');
-    } 
-    }catch(err){
-        console.error('regEx failed',err);
-        console.log('user name or pasword is less than 8');
-        res.json({response:'failed',message:'user name or pasword is less than 8'})
+    const test = regEx.test(req.body.password)
+    if(!test) return res.status(406).json({response:'failed',message:'password should contain at least one capital,one small,one special charecter,one number and should be atleast 8 charecter long'})
+
+    if(req.body.userName.length > 8 && test){
+
+       try{
+         // hashing the password using bcrypt
+         const hashedPass = await bcrypt.hash(req.body.password,10)
+ 
+         const data =  new ModelUserData(req.body)
+         data.password = hashedPass
+         data.firstName = data.firstName.toLowerCase()
+         data.secondName = data.secondName.toLowerCase()
+         data.userId = randomstring.generate()+Math.random()
+
+         await data.save();
+ 
+         res.json({response:'success',message:'data posted to db'})
+         console.log('data posted to db');
+
+       }catch(err){
+        console.log('client err !');
+        console.error(err);
+        let errMessage = err.code===11000?'duplicate err!!,username or password or email already exist!':
+        'check data entered, client error !'
+        res.status(406).json({response:'failed',message:errMessage})
+       }
+    }else{
+        console.log('user name is less than 8 or other uncatch error !');
+        res.status(406).json({response:'failed',message:'user name is less than 8 or other uncatch error !'})
     }
+   
 })
 
-router.post('/authorise', async(req,res)=>{
-    let response
-    let message
-    let isLogedIn
-    let userFullName
-    let userId
-    let jwtToken
-    let refreshJwtToken
+// user login handle 
+router.post('/authorise',hasApiKey, async(req,res)=>{
+    //checking req.body exists ?
+    if(!req.body.userName && !req.body.password) { 
+        return res.status(406).json({
+        response:'failed',message:'username or password is missing'
+    }) 
+}console.log(req.body);
+    if(req.body.userName.length<8||req.body.password<8){
+        return res.status(406).json({response:'failed', message:'username or password is incorrect or missing!'})
+    }
 
+    
+    //checking wheather userExist or not
     let data =  await ModelUserData.find({userName: req.body.userName})
-    // if(!data) response = 'failed'; message='check data entered'
-    console.log(data);
+    if(data.length===0||null) return res.status(404).json({response:'failed', message:'username is not found'})
 
-    const checkPass = await bcrypt.compare(req.body.password,data[0].password)
+    
+    // check if password is wrong
+    const checkPass = await checkBcrypt(req.body.password,data[0].password)
+    !checkPass&& res.status(401).json({response:'failed',message:'password is wrong'})
 
     if(data[0].userName===req.body.userName && checkPass){
-        // issuing a jwt tockent to user
-        let secretKey = process.env.JWT_SECRET_KEY
-        const userName = {userName: data[0].userName}
-         const tocken = jwt.sign(userName,secretKey,{expiresIn:'60s'})
-         const refreshToken = jwt.sign(userName,process.env.JWT_REFRESH_KEY)
-         refreshTokens.push(refreshToken)
-         console.log(refreshTokens);
-         
-         jwtToken = tocken
-         refreshJwtToken = refreshToken
-         
-         res.cookie("jwt",tocken)
-         res.cookie("jwt",'fdfdfdfdfdf')
-        response = 'success'
-        message='user is authorised'
-        isLogedIn = true
-        userFullName = data[0].firstName +" "+ data[0].secondName
-        userId = data[0]._id        
+       try{
+         // issueing a jwt tockent to user
+         const tokens = await issueToken(data[0].userName)
+         !tokens||null&& res.status(500).json({response:'failed',message:'sorry server busy !!'})
+ 
+         // setting isActive true in DB
+         const setActive = await ModelUserData.findByIdAndUpdate(data[0]._id,{isActive:true},{new:true})
+        
+         const userDetails = {
+            userId : data[0].userId,
+            userName : data[0].userName,
+            fullName : data[0].firstName +' ' + data[0].secondName
+        }
+        res.cookie('token',tokens.token, { domain: 'localhost', path: '/', secure: true, httpOnly: true })
+         res.json({response:'success',message:'user is active for 60s',userDetails,tokens:tokens})
+
+       }catch(err){
+        console.log('error issuing token or setting user isActive');
+        console.error(err);
+
+        res.status(500).json({response:'failed',message:'error issuing token or setting user isActive'})
+       }
     }
-    else{
-        response = 'failed'
-        message = 'Unauthorized: Invalid username or password'
-        isLogedIn = false
-        // throw new Error('Unauthorized: Invalid username or password');
-    }
-    // res.setHeader('Set-Cookie',jwtTocken)
-    res.json({response,message,isLogedIn,userFullName,userId,jwtToken,refreshJwtToken})
+    
+
+  
 })
 
-//update handle
-router.put('/',async(req,res)=>{
-    console.log(req.body);
+//update user address handle
+router.put('/:id',hasApiKey,async(req,res)=>{
+    
+    //verifying client token
+    const queryToken = req.query.token?req.query.token : ''
+    const authHeader = req.headers.authorization?req.headers['authorization'].split(' ')[1] : ''
+    const authToken = queryToken?queryToken:authHeader
+
+    if(!authToken) return res.status(401).json({respose:'failed',message:'no token found !'})
+    //verify token
+    const hasToken = await verifyToken(authToken)
+    // console.log(hasToken,'has token:');
+    if(hasToken !== true) return res.status(401).json({response:'failed',message:'token is invalid or expired'})
+
+    //check wheather address is empty or not
+    const isReqExist = await checkUpdateAddress(req.body)
+    // console.log(isReqExist,': address exist or not');
+    if(!isReqExist) return res.status(406).json({response:'failed',message:'all field of address is required'})
+    
    try{
-    const userId = req.body.userId
-    delete req.body.userId
+    // geting userId
+    const userId = req.params.id
     const update = req.body
-    const data = await ModelUserData.findByIdAndUpdate(userId,{address:update},{new:true})
-    res.json({response:'success',message:'user data updated',data})
+    
+    //finding user
+    const find = await ModelUserData.find({userId: userId})
+    if(!find) return res.status(404).json({response:'failed',message:'not a registered user'})
+
+    //update user address
+    console.log(find);
+    const data = await ModelUserData.findByIdAndUpdate(find[0]._id,{address:update},{new:true},{_id:0}).exec()
+    
+    res.json({response:'success',message:'user data updated',updated:data.address})
    }catch(err){
-    console.log('error updating adding userdata');
+    console.log('error updating userdata');
     console.error(err);
-    res.json({response:'failed',message:'server error'})
+    res.status(500).json({response:'failed',message:'oops! server error! please try again in one minute'})
    }
 })
-//middleware to check jwt login tocken
-// const authenticate = (req,res,next)=>{
-//     const authHeader = req.headers['Authorization']
-//     console.log(authHeader);
-//     const token = authHeader && authHeader.split(' ')[1]
-//     if(!token)return res.sendStatus(401)
 
-//     jwt.verify(token,process.env.JWT_SECRET_KEY,(err,user)=>{
-//         if(err) return res.sendStatus(403)
-//         req.user = user
-//     next()
-//     })
+router.put('/bought-items/:id',async(req,res)=>{
+    if(Object.keys(req.body).length < 1)return res.status(404).json({
+        response:'success',message:'no query found'
+    })
+    const userId = req.params.id
+    const newProducts = req.body.boughtItems
+    // console.log(req.body);
+    console.log(newProducts);
+    try{
+        const find = await ModelUserData.find({userId:userId},'boughtItems',{_id:0})
+        .select({_id:0})
+        .exec()
+        console.log(find);
+        if(!find||find.length<1)return  res.status(404).json({
+            response:'success',message:'no user found'
+        })
+        const newObj = {
+            time: new Date,
+            productId:''
+        }
+        if(find[0].boughtItems){
+           const newArr = []
+           const update = newProducts.map(id=>{
+            newObj.productId = id
+            newArr.push(newObj)
+           })
+           console.log(update);
+           console.log(newArr);
+           const updatedArr = find[0].boughtItems.concat(newArr)
 
-//middle to verify token
-// const verifyToken = (req,res,next)=>{
-//     const token = req.headers['Authorization']
-//     console.log(token);
-
-//     const jwt = token.split(' ')[1]
-//     console.log(jwt);
-//     next()
-// }
-
-router.get('/jwt-test',(req,res)=>{
-
-    // const authHeader = req.headers['Authorization']
-    // console.log(authHeader);
-    // const token = authHeader && authHeader.split(' ')[1]
-    // if(!token)return res.sendStatus(401)
-
-    // jwt.verify(token,process.env.JWT_SECRET_KEY,(err,user)=>{
-    //     if(err) return res.sendStatus(403)
-    //     req.user = user
-    // })
-    // res.cookie("jwt",'fdfdfdfdfdf')
-
-    res.send({response:'success'})
+            try{
+                const data = await ModelUserData.updateOne({userId:userId},{boughtItems:updatedArr}).exec()
+                res.json({response:'success',message:'updated boughtitems',data})
+            }catch(err){
+                console.log('error in updating to bought items');
+                console.error(err);
+            }
+        }
+       
+        // const existingArr = [...find[0].boughtItems.productArr]
+        // console.log(existingArr,'exist');
+    //     const update = newProducts.map(id=> newObj.productArr.push(id))
+    //     console.log(update);
+    //     console.log(newObj);
+    }catch(err){
+        console.log('error in updating to bouught items');
+        console.error(err);
+    }
 })
 
+// admin log in handle
+router.post('/admin-login',async(req,res)=>{
+    //checking req.body exists ?
+    (!req.body.userName && !req.body.password) && res.status(406).json({
+        response:'failed',message:'username or password is missing'
+    })
+
+    //checking username from db
+        const findUser = await ModelUserData.find({userName:req.body.userName})
+        console.log(findUser,': find user');
+        if(!findUser||findUser.length===0) {
+            return res.status(404).json({response:'failed',message:"admin username doesn't exist"})
+        }
+   
+
+    //varifying password
+    const verifyPass = await checkBcrypt(req.body.password,findUser[0].password)
+    if(!verifyPass) return res.status(406).json({response:'failed',message:"admin password is wrong"})
+
+    //issue token & setting admin true in db
+    const token = jwt.sign(
+        {username:findUser[0].username},process.env.JWT_ADMIN_SECRET_KEY,{expiresIn:'300s'})
+        if(!token||token===null||token===null){
+            return res.status(500).json({response:'failed',message:"server error in jwt"})
+        }
+        try{
+            const isActive = await ModelUserData.findByIdAndUpdate(findUser[0]._id,{admin:true},{_id:0})
+        }catch(err){
+            console.log('error in setting admin true');
+            console.error(err);
+        }
+
+        const resData = {username:findUser[0].userName,userId:findUser[0].userId}
+        res.json({response:'success',resData,token})
+})
 
 export default router
