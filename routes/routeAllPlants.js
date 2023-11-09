@@ -113,7 +113,7 @@ router.post('/admin-post',hasApiKey,async(req,res)=>{
       data.plantId = randomstring.generate()
 
       await data.save();
-      res.status(201).json({res:'success',message:'new plant is posted to database'})
+      res.status(201).json({response:'success',message:'new plant is posted to database'})
   }
   catch(err){
    console.error('unable to find data',err);
@@ -122,7 +122,7 @@ router.post('/admin-post',hasApiKey,async(req,res)=>{
 
 })
 
-router.put('/admin-put/:id',hasApiKey,async(req,res)=>{
+router.put('/admin-put/:name',hasApiKey,async(req,res)=>{
    const queryToken = req.query.token ? req.query.token : ''
    const authHeader = req.headers.authorization ? req.headers.authorization.split(' ')[1] : ''
    const adminToken = authHeader? authHeader : queryToken
@@ -134,13 +134,13 @@ router.put('/admin-put/:id',hasApiKey,async(req,res)=>{
    })
    if(isTokenTrue !== true) return res.status(401).json({response:'failed',message:'invalid token'})
 
-   const plantId = req.params.id
-   if(!plantId) return res.status(404).json({response:'failed',message:'no plant id'})
+   const name = req.params.name
+   if(!name) return res.status(404).json({response:'failed',message:'no plant id'})
 
    const update = req.body
 
    try{
-         const data = await ModelAllPlants.updateOne({plantId:plantId},update,{new:true,_id:0})
+         const data = await ModelAllPlants.updateOne({name:name},update,{new:true,_id:0})
          console.log(data);
          if(!data||data.acknowledged===false) return res.status(404).json({response:'failed'})
      

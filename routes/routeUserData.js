@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 import 'dotenv/config'
 import randomstring from 'randomstring'
 import { hasApiKey } from '../middleware/checkApiKey.js'
-import { checkBcrypt, checkQueryUser, checkUpdateAddress, issueToken, verifyToken } from '../functions.module.js'
+import { checkBcrypt, checkQueryUser, checkUpdateAddress, issueToken, verifyAdminToken, verifyToken } from '../functions.module.js'
 
 const router = express.Router()
 
@@ -22,7 +22,29 @@ router.get('/:id',hasApiKey,async(req,res)=>{
     const authToken = queryToken?queryToken:authHeader
 
     if(!authToken) return res.status(401).json({respose:'failed',message:'no token found !'})
-    //verify token
+
+    // hadle to get admin bought history
+    if(req.params.id==='all-bought'){
+    //checking wheather admin has token or not
+    const hasToken = await verifyAdminToken(authToken)
+    console.log(hasToken,'token');
+    if(hasToken !== true) return res.status(401).json({
+        response:'failed',message:'token is invalid or expired'}) 
+
+        try{
+            const find = await ModelUserData.find({},'boughtItems').select({_id:0,boughtItems:1}).exec()
+            
+            const data = find.map(itm=> (itm.boughtItems))
+             .filter(itm=>itm.length>0)
+            
+            res.json({response:'success',message:'all bought items',data})
+        }catch(err){
+            console.log('error i fetching bought items');
+            console.error(err);
+        }
+    }
+    else{
+        //verify client token 
     const hasToken = await verifyToken(authToken)
     // console.log(hasToken,'has token:');
     if(hasToken !== true) return res.status(401).json({response:'failed',message:'token is invalid or expired'})
@@ -48,8 +70,11 @@ router.get('/:id',hasApiKey,async(req,res)=>{
         }else{
             res.status(406).json({response:'failed',message:'query not found!'})
         }
+    }
         
 })
+
+
 
 // user registration handle
 router.post('/',hasApiKey,async(req,res)=>{
@@ -185,9 +210,9 @@ router.put('/:id',hasApiKey,async(req,res)=>{
    }
 })
 
-router.put('/bought-items/:id',async(req,res)=>{
+router.put('/bought-items/:id',hasApiKey,async(req,res)=>{
     if(Object.keys(req.body).length < 1)return res.status(404).json({
-        response:'success',message:'no query found'
+        response:'failed',message:'no query found'
     })
     const userId = req.params.id
     const newProducts = req.body.boughtItems
@@ -199,7 +224,7 @@ router.put('/bought-items/:id',async(req,res)=>{
         .exec()
         console.log(find);
         if(!find||find.length<1)return  res.status(404).json({
-            response:'success',message:'no user found'
+            response:'failed',message:'no user found'
         })
         const newObj = {
             time: new Date,
@@ -207,13 +232,10 @@ router.put('/bought-items/:id',async(req,res)=>{
         }
         if(find[0].boughtItems){
            const newArr = []
-           const update = newProducts.map(id=>{
-            newObj.productId = id
-            newArr.push(newObj)
-           })
+           const update = newProducts.map(id=>({time : new Date,productId:id}))
            console.log(update);
            console.log(newArr);
-           const updatedArr = find[0].boughtItems.concat(newArr)
+           const updatedArr = find[0].boughtItems.concat(update)
 
             try{
                 const data = await ModelUserData.updateOne({userId:userId},{boughtItems:updatedArr}).exec()
@@ -236,10 +258,14 @@ router.put('/bought-items/:id',async(req,res)=>{
 })
 
 // admin log in handle
-router.post('/admin-login',async(req,res)=>{
+//userName & password
+router.post('/admin-login',hasApiKey,async(req,res)=>{
     //checking req.body exists ?
     (!req.body.userName && !req.body.password) && res.status(406).json({
         response:'failed',message:'username or password is missing'
+    })
+    if(req.body.userName !== 'neshinnelson') return res.status(401).json({
+        response:'failed',message:'unathorized access'
     })
 
     //checking username from db
